@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:15
+    container_name: events_db_timepay
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "4123:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: events_redis_timepay
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python -m robyn app.py --dev
+    volumes:
+      - .:/app
+      - ./event_images:/app/event_images
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A celery_config worker --loglevel=info --concurrency=2 -E
+    volumes:
+      - .:/app
+      - ./event_images:/app/event_images
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A celery_config beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+  redis_data:

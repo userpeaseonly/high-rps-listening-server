@@ -1,0 +1,113 @@
+# ────────────────────────────────────────────────────────────
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pyc
+*.pyd
+
+# Byte-compiled / optimized / DLL files
+*.so
+*.dylib
+
+# C extensions
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+pip-wheel-metadata/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs/editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Test and coverage
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.tox/
+.mypy_cache/
+.pylint.d/
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+alembic/versions/*.egg-info
+
+# Logs
+*.log
+logs/
+log/
+
+# Environment variables
+.env
+.env.*
+*.env
+*.local.env
+
+# SQLite and DB files
+*.db
+*.sqlite3
+
+# Static/media files
+event_images/
+face_images/
+brand_images/
+media/
+static/
+assets/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.bak
+*.swp
+*.tmp
+
+# Docker
+*.pid
+*.pid.lock
+docker-compose.override.yml
+
+# Git
+.git/
+!.gitignore
+
+
+upload_imatges/
+logs/
+
+backup.dump
+
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
