@@ -11,5 +11,5 @@ async def add_to_outbox(db: AsyncSession, aggregate_id: str, aggregate_type: str
         payload=payload
     )
     db.add(outbox_event)
-    await db.flush()  # Flush to get the ID
-    return 
+    await db.flush()
+    return outbox_event

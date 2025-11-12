@@ -1,5 +1,6 @@
 # router.py
 import logging
+import asyncio
 from robyn import SubRouter, Request, Response, exceptions, status_codes
 from pydantic import TypeAdapter
 
@@ -7,7 +8,7 @@ from events.schemas.events import HeartbeatInfo, EventNotificationAlert, EventUn
 from events import utils, crud, models
 from outbox.crud import add_to_outbox
 from db import AsyncSessionLocal
-from tasks.triggers import trigger_event_publish
+from tasks.repository import _publish_event_by_id
 
 from events.dependencies import extract_event_data
 
@@ -40,18 +41,19 @@ async def receive_event(request: Request, router_dependencies) -> Response:
             )
             async with AsyncSessionLocal() as db:
                 saved_heartbeat = await crud.create_heartbeat(event_in, db)
-                # Add to outbox for Kafka publishing
-                outbox_event = await add_to_outbox(
-                    db, 
-                    str(saved_heartbeat.id), 
-                    "Heartbeat",
-                    "heartbeat.created",
-                    event.model_dump(mode='json')  # Use mode='json' to serialize datetime
-                )
-                await db.commit()
+            #     # Add to outbox for Kafka publishing + we don't need to publish heartbeat to kafka
+            #     outbox_event = await add_to_outbox(
+            #         db, 
+            #         str(saved_heartbeat.id), 
+            #         "Heartbeat",
+            #         "heartbeat.created",
+            #         event.model_dump(mode='json')  # Use mode='json' to serialize datetime
+            #     )
+            #     await db.commit()
                 
-                # Trigger immediate Celery task for fast processing
-                trigger_event_publish(outbox_event.id)
+            # logger.info(f"Heartbeat saved with ID: {outbox_event}")
+            # # Publish to Kafka directly (non-blocking fire-and-forget)
+            # asyncio.create_task(_publish_event_by_id(outbox_event.id))
         elif isinstance(event, EventNotificationAlert):
                 utils.log_pretty_event(event)
                 event_in = models.Event(
@@ -83,19 +85,21 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                 )
                 async with AsyncSessionLocal() as db:
                     saved_event = await crud.create_event(event_in, db)
-                    # Add to outbox for Kafka publishing
-                    outbox_event = await add_to_outbox(
-                        db, 
-                        str(saved_event.id), 
-                        "Event", 
-                        "access_control.event_created",
+                    # Add to outbox for Kafka publishing if purpose is ATTENDANCE
+                    if event_in.purpose == models.PersonPurpose.ATTENDANCE:
+                        outbox_event = await add_to_outbox(
+                            db, 
+                            str(saved_event.id), 
+                            "Event", 
+                            "access_control.event_created",
                         event.model_dump(mode='json')  # Use mode='json' to serialize datetime
                     )
                     await db.commit()
-                    outbox_event = await db.refresh(outbox_event)
-                    logger.debug("Outbox event created, triggering publish task: ", outbox_event)
-                    # Trigger immediate Celery task for fast processing
-                    trigger_event_publish(outbox_event.id)
+                    
+                logger.info(f"Event saved with ID: {outbox_event}")
+                # Publish to Kafka directly (non-blocking fire-and-forget)
+                if event_in.purpose == models.PersonPurpose.ATTENDANCE:
+                    asyncio.create_task(_publish_event_by_id(outbox_event.id))
         else:
             logger.warning("Received unknown event type.")
             raise exceptions.HTTPException(
