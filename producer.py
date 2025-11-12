@@ -9,15 +9,19 @@ import json
 import logging
 import time
 import uuid
+
+from enum import Enum
+
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
+
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaError, KafkaTimeoutError
-from enum import Enum
+
+import config
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MessagePriority(Enum):
@@ -29,9 +33,9 @@ class MessagePriority(Enum):
 @dataclass
 class ProducerConfig:
     """Producer configuration settings"""
-    bootstrap_servers: str = "23.88.61.136:9092"
-    default_topic: str = "raw_events"
-    client_id: str = "time-pay-producer"
+    bootstrap_servers: str = config.KAFKA_BOOTSTRAP_SERVERS
+    default_topic: str = config.DEFAULT_KAFKA_TOPIC
+    client_id: str = config.DEFAULT_CLIENT_ID
     acks: str = "all"
     enable_idempotence: bool = True
     retry_backoff_ms: int = 100

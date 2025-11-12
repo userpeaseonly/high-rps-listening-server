@@ -24,3 +24,12 @@ tz = ZoneInfo(TIME_ZONE)
 
 # Redis URL for Celery broker and result backend
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+
+DEFAULT_KAFKA_TOPIC = "attendance_records"
+
+DEFAULT_CLIENT_ID = "time-pay-event-producer"
+
