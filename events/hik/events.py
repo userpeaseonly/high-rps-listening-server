@@ -95,12 +95,11 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                             "access_control.event_created",
                         event.model_dump(mode='json')  # Use mode='json' to serialize datetime
                     )
+                        logger.info(f"Event saved with ID: {outbox_event}")
+                        if event_in.purpose == models.PersonPurpose.ATTENDANCE:
+                            asyncio.create_task(_publish_event_by_id(outbox_event.id))# Publish to Kafka directly (non-blocking fire-and-forget)
                     await db.commit()
                     
-                    logger.info(f"Event saved with ID: {outbox_event}")
-                    # Publish to Kafka directly (non-blocking fire-and-forget)
-                    if event_in.purpose == models.PersonPurpose.ATTENDANCE:
-                        asyncio.create_task(_publish_event_by_id(outbox_event.id))
         else:
             logger.warning("Received unknown event type.")
             raise exceptions.HTTPException(
