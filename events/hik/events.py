@@ -40,8 +40,8 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                 event_state=event.event_state,
                 event_description=event.event_description
             )
-            async with AsyncSessionLocal() as db:
-                saved_heartbeat = await crud.create_heartbeat(event_in, db)
+            # async with AsyncSessionLocal() as db:
+            #     saved_heartbeat = await crud.create_heartbeat(event_in, db)
             #     # Add to outbox for Kafka publishing + we don't need to publish heartbeat to kafka
             #     outbox_event = await add_to_outbox(
             #         db, 
@@ -97,10 +97,10 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                     )
                     await db.commit()
                     
-                logger.info(f"Event saved with ID: {outbox_event}")
-                # Publish to Kafka directly (non-blocking fire-and-forget)
-                if event_in.purpose == models.PersonPurpose.ATTENDANCE:
-                    asyncio.create_task(_publish_event_by_id(outbox_event.id))
+                    logger.info(f"Event saved with ID: {outbox_event}")
+                    # Publish to Kafka directly (non-blocking fire-and-forget)
+                    if event_in.purpose == models.PersonPurpose.ATTENDANCE:
+                        asyncio.create_task(_publish_event_by_id(outbox_event.id))
         else:
             logger.warning("Received unknown event type.")
             raise exceptions.HTTPException(
