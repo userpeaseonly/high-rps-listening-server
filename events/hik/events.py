@@ -26,8 +26,9 @@ async def receive_event(request: Request, router_dependencies) -> Response:
     event_data = await _extract_event_data(request)
 
     # Extract picture from request files
-    picture_name = list(request.files.keys())[0]
-    picture = request.files.get(picture_name) # if you want to save the picture, you can.
+    if request.files:
+        picture_name = list(request.files.keys())[0]
+        picture = request.files.get(picture_name) # if you want to save the picture, you can.
     
     try:
         event = TypeAdapter(EventUnion).validate_python(event_data)
