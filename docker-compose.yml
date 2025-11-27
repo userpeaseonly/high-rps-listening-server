@@ -36,6 +36,10 @@ services:
     restart: always
     env_file:
       - .env
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   celery-worker:
     build:
