@@ -28,3 +28,4 @@ class VerifyMode(str, Enum):
     CARD_OR_FACE = "cardOrFace"
     CARD_OR_FACE_OR_FP = "cardOrFaceOrFp"
     CARD_OR_FP_OR_PW = "cardOrFpOrPw"
+    FACE_OR_PW = "faceOrPw"
