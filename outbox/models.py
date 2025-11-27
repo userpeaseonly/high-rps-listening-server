@@ -3,8 +3,9 @@ from sqlalchemy import String, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
-from db import Base
 
+import config
+from db import Base
 
 
 class OutboxEvent(Base):
@@ -15,8 +16,7 @@ class OutboxEvent(Base):
     aggregate_type: Mapped[str] = mapped_column(String, nullable=False)  # "Event" or "Heartbeat"
     event_type: Mapped[str] = mapped_column(String, nullable=False)  # "event.created", "heartbeat.created"
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
-    processed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
