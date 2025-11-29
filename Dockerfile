@@ -11,4 +11,6 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["python", "-m", "app.py", "--dev", "--log-level=DEBUG"]
+# CMD ["python", "-m", "app.py", "--dev", "--log-level=DEBUG"]
+
+CMD ["python", "app.py", "--processes=1", "--workers=4", "--log-level=DEBUG"]

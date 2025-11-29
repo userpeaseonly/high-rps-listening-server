@@ -24,7 +24,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python -m robyn app.py --dev
+    command: python app.py --processes=1 --workers=4
     volumes:
       - .:/app
       - ./event_images:/app/event_images
