@@ -28,26 +28,8 @@ async def run_migrations():
                 logger.info("✅ Migrations already applied, skipping")
                 return
             
-            # Migration 1: Add unique constraint WITHOUT cleaning duplicates
-            logger.info("Adding unique constraint for future duplicate prevention...")
-            
-            # Count existing duplicates (for info only)
-            dup_result = await db.execute(text("""
-                SELECT COUNT(*) FROM (
-                    SELECT device_id, serial_no, date_time 
-                    FROM events 
-                    WHERE serial_no IS NOT NULL
-                    GROUP BY device_id, serial_no, date_time 
-                    HAVING COUNT(*) > 1
-                ) AS dupes
-            """))
-            dup_count = dup_result.scalar()
-            
-            if dup_count > 0:
-                logger.warning(f"⚠️ Found {dup_count} existing duplicate groups (will be left as-is)")
-                logger.info("💡 New duplicates will be prevented by constraint")
-            else:
-                logger.info("✅ No duplicate events found")
+            # Migration 1: Add unique constraint for future duplicates only
+            logger.info("Adding constraint to prevent future duplicates (old data unchanged)...")
             
             # Add ONLY partial unique index for new rows (no full table index)
             # This takes seconds instead of hours
