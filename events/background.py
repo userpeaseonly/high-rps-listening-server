@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from typing import List
+from datetime import datetime, timezone
 from sqlalchemy import select
 from db import AsyncSessionLocal
 from outbox.models import OutboxEvent
 from producer import get_producer_service, MessagePriority
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class OutboxProcessor:
                     if result["success"]:
                         # Mark as processed
                         event.processed = True
-                        event.processed_at = datetime.utcnow()
+                        event.processed_at = datetime.now(timezone.utc)
                         await db.commit()
                         logger.debug(f"Published outbox event {event.id}")
                     else:

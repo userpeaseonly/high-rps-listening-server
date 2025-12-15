@@ -1,9 +1,9 @@
 import logging
+from datetime import datetime, timezone
 from sqlalchemy import select, update
 from db import AsyncSessionLocal
 from outbox.crud import OutboxEvent
 from producer import get_producer_service, MessagePriority
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def _process_outbox_batch(batch_size: int = 100):
                             .where(OutboxEvent.id == event.id)
                             .values(
                                 processed=True,
-                                processed_at=datetime.utcnow()
+                                processed_at=datetime.now(timezone.utc)
                             )
                         )
                         processed_count += 1
@@ -108,7 +108,7 @@ async def _publish_event_by_id(event_id: int):
                     .where(OutboxEvent.id == event.id)
                     .values(
                         processed=True,
-                        processed_at=datetime.utcnow()
+                        processed_at=datetime.now(timezone.utc)
                     )
                 )
                 await db.commit()
@@ -119,4 +119,33 @@ async def _publish_event_by_id(event_id: int):
                 
     except Exception as e:
         logger.error(f"Error publishing single event {event_id}: {e}")
+        raise
+
+
+async def _cleanup_old_outbox_events(retention_hours: int = 24) -> int:
+    """
+    Delete processed outbox events older than retention period.
+    Returns count of deleted records.
+    """
+    try:
+        from sqlalchemy import delete
+        
+        cutoff_time = datetime.now(timezone.utc) - __import__('datetime').timedelta(hours=retention_hours)
+        
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                delete(OutboxEvent)
+                .where(OutboxEvent.processed == True)
+                .where(OutboxEvent.processed_at < cutoff_time)
+            )
+            await db.commit()
+            deleted_count = result.rowcount
+            
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} processed outbox events older than {retention_hours} hours")
+            
+            return deleted_count
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up outbox events: {e}", exc_info=True)
         raise

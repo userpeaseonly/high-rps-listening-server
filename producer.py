@@ -334,16 +334,31 @@ class KafkaProducerService:
 
 # Singleton instance for easy import
 producer_service = None
+producer_lock = asyncio.Lock()
 
 async def get_producer_service(config: Optional[ProducerConfig] = None) -> KafkaProducerService:
-    """Get or create producer service instance"""
+    """Get or create producer service instance with health validation"""
     global producer_service
     
-    if producer_service is None:
-        producer_service = KafkaProducerService(config)
-        await producer_service.start()
-    
-    return producer_service
+    async with producer_lock:
+        # If no existing instance, create new one
+        if producer_service is None:
+            producer_service = KafkaProducerService(config)
+            await producer_service.start()
+            return producer_service
+        
+        # Validate existing instance is healthy
+        if not producer_service.is_running:
+            logger.warning("Producer service not running, restarting...")
+            try:
+                await producer_service.stop()
+            except Exception as e:
+                logger.error(f"Error stopping unhealthy producer: {e}")
+            
+            producer_service = KafkaProducerService(config)
+            await producer_service.start()
+        
+        return producer_service
 
 async def cleanup_producer_service():
     """Cleanup producer service on shutdown"""

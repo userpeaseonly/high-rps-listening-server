@@ -38,6 +38,11 @@ celery.conf.update(
             'schedule': 10.0,  # Run every 10 seconds
             'options': {'queue': 'outbox'}
         },
+        'cleanup-processed-outbox-events': {
+            'task': 'tasks.task.cleanup_processed_outbox_events',
+            'schedule': config.OUTBOX_CLEANUP_INTERVAL,  # Configurable interval
+            'options': {'queue': 'outbox'}
+        },
     },
     
     # Result backend settings
