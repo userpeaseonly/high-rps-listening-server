@@ -49,25 +49,16 @@ async def run_migrations():
             else:
                 logger.info("✅ No duplicate events found")
             
-            # Add index and constraint WITHOUT the unique constraint on existing data
-            # We'll use a partial unique index that only applies to NEW data
+            # Add ONLY partial unique index for new rows (no full table index)
+            # This takes seconds instead of hours
             await db.execute(text("""
                 DO $$ 
                 BEGIN
-                    -- Add regular index for performance
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_indexes 
-                        WHERE indexname = 'idx_event_lookup'
-                    ) THEN
-                        CREATE INDEX idx_event_lookup ON events (device_id, serial_no, date_time);
-                        RAISE NOTICE 'Created index idx_event_lookup';
-                    END IF;
-                    
                     -- Add partial unique constraint (only for new rows)
                     -- This allows existing duplicates but prevents new ones
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint 
-                        WHERE conname = 'uq_event_device_serial_time'
+                        SELECT 1 FROM pg_indexes 
+                        WHERE indexname = 'uq_event_device_serial_time'
                     ) THEN
                         CREATE UNIQUE INDEX uq_event_device_serial_time 
                         ON events (device_id, serial_no, date_time)
