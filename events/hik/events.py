@@ -18,6 +18,15 @@ router = SubRouter(__file__, prefix="/hik")
 
 router.inject(EXTRACT_EVENT_DATA=extract_event_data)
 
+def _handle_publish_error(task: asyncio.Task, event_id: int) -> None:
+    """Handle errors from fire-and-forget publish tasks"""
+    try:
+        task.result()  # Raises exception if task failed
+    except Exception as e:
+        logger.error(f"Fire-and-forget publish failed for outbox event {event_id}: {e}", exc_info=True)
+        # Error is logged but doesn't block the HTTP response
+        # Celery Beat will retry this event in the next batch
+
 @router.post("/events")
 async def receive_event(request: Request, router_dependencies) -> Response:
     # Extract event data using the injected dependency
@@ -84,21 +93,42 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                     mask=event.access_controller_event.mask,
                     picture_url=None
                 )
-                async with AsyncSessionLocal() as db:
-                    saved_event = await crud.create_event(event_in, db)
-                    # Add to outbox for Kafka publishing if purpose is ATTENDANCE
-                    if event_in.purpose == models.PersonPurpose.ATTENDANCE:
-                        outbox_event = await add_to_outbox(
-                            db, 
-                            str(saved_event.id), 
-                            "Event", 
-                            "access_control.event_created",
-                        event.model_dump(mode='json')  # Use mode='json' to serialize datetime
-                    )
-                        logger.info(f"Event saved with ID: {outbox_event}")
+                
+                try:
+                    async with AsyncSessionLocal() as db:
+                        saved_event = await crud.create_event(event_in, db)
+                        # Add to outbox for Kafka publishing if purpose is ATTENDANCE
+                        outbox_event_id = None
                         if event_in.purpose == models.PersonPurpose.ATTENDANCE:
-                            asyncio.create_task(_publish_event_by_id(outbox_event.id))# Publish to Kafka directly (non-blocking fire-and-forget)
-                    await db.commit()
+                            outbox_event = await add_to_outbox(
+                                db, 
+                                str(saved_event.id), 
+                                "Event", 
+                                "access_control.event_created",
+                                event.model_dump(mode='json')  # Use mode='json' to serialize datetime
+                            )
+                            outbox_event_id = outbox_event.id
+                            logger.info(f"Event saved with ID: {saved_event.id}, Outbox ID: {outbox_event_id}")
+                        await db.commit()
+                        
+                        # Fire-and-forget publish AFTER commit (with error handling)
+                        if outbox_event_id:
+                            task = asyncio.create_task(_publish_event_by_id(outbox_event_id))
+                            task.add_done_callback(lambda t: _handle_publish_error(t, outbox_event_id))
+                            
+                except Exception as db_error:
+                    # Check if it's a duplicate event (unique constraint violation)
+                    if "uq_event_device_serial_time" in str(db_error) or "duplicate key" in str(db_error).lower():
+                        logger.warning(f"Duplicate event received from device {event.device_id}, serial_no {event.access_controller_event.serial_no}")
+                        # Return success for duplicate - idempotent behavior
+                        return Response(
+                            status_code=status_codes.HTTP_200_OK, 
+                            description="Event already processed (duplicate)", 
+                            headers={"Content-Type": "application/json"}
+                        )
+                    else:
+                        # Re-raise other database errors
+                        raise
                     
         else:
             logger.warning("Received unknown event type.")
@@ -107,10 +137,12 @@ async def receive_event(request: Request, router_dependencies) -> Response:
                 detail="Unknown event type."
             )
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error processing event: {e}", exc_info=True)
+        # Sanitize error response - don't leak internal details
+        error_detail = "Internal server error" if not isinstance(e, exceptions.HTTPException) else str(e)
         raise exceptions.HTTPException(
             status_code=status_codes.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=error_detail
         )
 
     return Response(status_code=status_codes.HTTP_200_OK, description="Event processed successfully.", headers={"Content-Type": "application/json"})

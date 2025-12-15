@@ -33,4 +33,9 @@ DEFAULT_KAFKA_TOPIC = os.getenv('DEFAULT_KAFKA_TOPIC', 'attendance_records')
 
 DEFAULT_CLIENT_ID = os.getenv('DEFAULT_CLIENT_ID', 'time-pay-event-producer')
 
+# Outbox configuration
+OUTBOX_RETENTION_HOURS = int(os.getenv('OUTBOX_RETENTION_HOURS', '24'))  # Keep processed events for 24 hours
+OUTBOX_CLEANUP_INTERVAL = float(os.getenv('OUTBOX_CLEANUP_INTERVAL', '3600'))  # Cleanup every hour
+OUTBOX_BATCH_SIZE = int(os.getenv('OUTBOX_BATCH_SIZE', '100'))  # Process 100 events per batch
+
 

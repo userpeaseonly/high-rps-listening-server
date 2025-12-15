@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum as SqEnum
+from sqlalchemy import String, Enum as SqEnum, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.types import DateTime
@@ -26,6 +26,10 @@ person_purpose_enum = PgEnum(
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        UniqueConstraint('device_id', 'serial_no', 'date_time', name='uq_event_device_serial_time'),
+        Index('idx_event_lookup', 'device_id', 'serial_no', 'date_time'),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
