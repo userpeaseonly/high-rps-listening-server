@@ -3,14 +3,22 @@ Manual database migrations
 Run these on startup to keep schema in sync with models
 """
 import logging
+import os
 from sqlalchemy import text
 from db import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
+# Allow disabling migrations via env var (set RUN_MIGRATIONS=false to skip)
+MIGRATIONS_ENABLED = os.getenv("RUN_MIGRATIONS", "true").lower() == "true"
+
 
 async def run_migrations():
     """Run pending migrations on startup"""
+    if not MIGRATIONS_ENABLED:
+        logger.info("⏭️ Migrations disabled (RUN_MIGRATIONS=false)")
+        return
+    
     logger.info("Running database migrations...")
     
     async with AsyncSessionLocal() as db:
