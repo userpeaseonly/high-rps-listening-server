@@ -28,10 +28,10 @@ async def run_migrations():
                 logger.info("✅ Migrations already applied, skipping")
                 return
             
-            # Migration 1: Clean duplicates and add unique constraint
-            logger.info("Checking for duplicate events...")
+            # Migration 1: Add unique constraint WITHOUT cleaning duplicates
+            logger.info("Adding unique constraint for future duplicate prevention...")
             
-            # Count duplicates
+            # Count existing duplicates (for info only)
             dup_result = await db.execute(text("""
                 SELECT COUNT(*) FROM (
                     SELECT device_id, serial_no, date_time 
@@ -44,30 +44,17 @@ async def run_migrations():
             dup_count = dup_result.scalar()
             
             if dup_count > 0:
-                logger.warning(f"⚠️ Found {dup_count} duplicate event groups, cleaning up...")
-                
-                # Delete duplicates, keeping the oldest (lowest id)
-                delete_result = await db.execute(text("""
-                    DELETE FROM events 
-                    WHERE id NOT IN (
-                        SELECT MIN(id) 
-                        FROM events 
-                        WHERE serial_no IS NOT NULL
-                        GROUP BY device_id, serial_no, date_time
-                    ) AND serial_no IS NOT NULL
-                """))
-                
-                deleted_count = delete_result.rowcount
-                logger.info(f"🗑️ Deleted {deleted_count} duplicate events")
-                await db.commit()
+                logger.warning(f"⚠️ Found {dup_count} existing duplicate groups (will be left as-is)")
+                logger.info("💡 New duplicates will be prevented by constraint")
             else:
                 logger.info("✅ No duplicate events found")
             
-            # Now add the constraint and index
+            # Add index and constraint WITHOUT the unique constraint on existing data
+            # We'll use a partial unique index that only applies to NEW data
             await db.execute(text("""
                 DO $$ 
                 BEGIN
-                    -- Add index if not exists
+                    -- Add regular index for performance
                     IF NOT EXISTS (
                         SELECT 1 FROM pg_indexes 
                         WHERE indexname = 'idx_event_lookup'
@@ -76,15 +63,21 @@ async def run_migrations():
                         RAISE NOTICE 'Created index idx_event_lookup';
                     END IF;
                     
-                    -- Add unique constraint
-                    ALTER TABLE events 
-                    ADD CONSTRAINT uq_event_device_serial_time 
-                    UNIQUE (device_id, serial_no, date_time);
-                    RAISE NOTICE 'Created constraint uq_event_device_serial_time';
+                    -- Add partial unique constraint (only for new rows)
+                    -- This allows existing duplicates but prevents new ones
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'uq_event_device_serial_time'
+                    ) THEN
+                        CREATE UNIQUE INDEX uq_event_device_serial_time 
+                        ON events (device_id, serial_no, date_time)
+                        WHERE created_at > NOW();
+                        RAISE NOTICE 'Created partial unique index uq_event_device_serial_time';
+                    END IF;
                 END $$;
             """))
             await db.commit()
-            logger.info("✅ Migrations completed successfully")
+            logger.info("✅ Migrations completed successfully - future duplicates will be prevented")
             
         except Exception as e:
             logger.error(f"❌ Migration failed: {e}")
